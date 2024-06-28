@@ -6,20 +6,9 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <signal.h>
 
-void parse_response(char* response, HTTP_Response_Status status, ContentType content_type, char* body){
-
-    const char *raw_response =
-        "%s %s\r\n"
-        "Content-Type: %s\r\n"
-        "Connection: close\r\n"
-        "\r\n %s" ;
-
-    sprintf(response, raw_response,HTTP_VERSION,  status, content_type, body);
-
-}
-
-struct AppController *create_app_controller(){
+struct AppController *create_app_controller(void){
     struct AppController *app_controller = (struct AppController*)malloc(sizeof(struct AppController)); 
     if(!app_controller){
         perror("[!] Error on creating app controller");
@@ -37,7 +26,7 @@ Controller* create_controller(Method method, char *route, Callback *callback){
     }
     controller->method = method;
     controller->route = route;
-    controller->Callback = callback;
+    controller->callback = callback;
 
     return controller;
 }
@@ -85,42 +74,37 @@ void request_handler(int* client_socket, struct AppController *app_controller) {
 
     char* path = headers[1];
     if (method == NULL || path == NULL) { 
-        printf("nomethod or path");
         close(*client_socket);
         return;
     }
     for(int i = 0; i < app_controller->controllers_c; i++)
     {
         if(strcmp(app_controller->controllers[i]->route,path) == 0 && strcmp((char*)app_controller->controllers[i]->method, method) == 0){
-            app_controller->controllers[i]->Callback(client_socket);
+            app_controller->controllers[i]->callback(client_socket);
             break;
         }
     }
     if(client_socket)
     {
-        char response[BUF_SIZE];
-        const char *raw_response =
-            "HTTP/1.1 404 Not Found\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "\r\n" 
-            "<head>"
-            "<title>404 Not Found</title>"
-            "</head>"
-            "<body>"
-            "<h1>Not Found</h1>"
-            "<p>The requested URL /%s was not found on this server.</p>"
-            "</body>"
-            "</html>";
-
-        sprintf(response, raw_response, path);
-
-        write(*client_socket, response, strlen(response));
-        close(*client_socket);
+        char body [BUF_SIZE];
+        char* b = strdup(HTTP_404_MESSAGE);
+        sprintf(body, b, path);
+        server_response((HTTPResponseOptions){.client_socket=client_socket,.body=body,.status_code=HTTP_STATUS_NOT_FOUND});
     }
 }
 
+void shutdown_server(int signal){
+    printf("%d",signal);
+    printf("[*] Shutting Down");
+    exit(EXIT_SUCCESS);
+}
+
 void run(struct AppController *app_controller, int port){
+    if(signal(SIGINT,shutdown_server) == SIG_ERR){
+        perror("Signal setting error: ");
+        exit(EXIT_FAILURE);
+    }
+
     int server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -161,4 +145,32 @@ void run(struct AppController *app_controller, int port){
     }
 
     close(server_socket);
+    close(client_socket);
 }
+
+
+void response_parser(char* response_cursor, HTTP_HEADERS content_type, HTTP_STATUS status_code, char* body){
+    sprintf(response_cursor, "%s %s\r\n%s\r\n%s\r\n\r\n%s",HTTP_VERSION, status_code, content_type, HTTP_H_ConnectionClose, body);
+}
+
+void server_response(HTTPResponseOptions http_response_options){
+    char response[BUF_SIZE];
+
+    response_parser(response, HTTP_H_ContentTypeHTML,http_response_options.status_code,http_response_options.body);
+
+    write(*http_response_options.client_socket, response, strlen(response));
+    close(*http_response_options.client_socket);
+}
+
+void server_response_json(HTTPResponseOptions http_response_options){
+    char response[BUF_SIZE];
+
+    response_parser(response, HTTP_H_ContentTypeJSON,http_response_options.status_code,http_response_options.body);
+
+    write(*http_response_options.client_socket, response, strlen(response));
+    close(*http_response_options.client_socket);
+}
+
+
+
+
