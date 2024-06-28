@@ -24,7 +24,6 @@ typedef struct HTTPResponseOptions{
     HTTP_STATUS status_code; 
 } HTTPResponseOptions;
 
-//typedef void Callback;
 typedef void(Callback)(int*);
 typedef struct Controller {
     char *route;
@@ -38,6 +37,12 @@ struct AppController {
 };
 
 struct AppController* create_app_controller(void);
+
+typedef struct RequestHandlerOptions{
+    int* client_socket;
+    struct AppController* app_controller;    
+} RequestHandlerOptions;
+
 typedef struct HTTP_request {
     char* method;
     char* path;

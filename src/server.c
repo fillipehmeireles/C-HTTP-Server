@@ -7,7 +7,9 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <pthread.h>
 
+void request_handler(int* client_socket, struct AppController* app_controller);
 struct AppController *create_app_controller(void){
     struct AppController *app_controller = (struct AppController*)malloc(sizeof(struct AppController)); 
     if(!app_controller){
@@ -43,7 +45,14 @@ void add_controller(struct AppController *app_controller,Method method, char *ro
     app_controller->controllers_c++;
 }
 
-void request_handler(int* client_socket, struct AppController *app_controller) { 
+void* request_handler_t(void* options) { 
+    RequestHandlerOptions *request_handler_opts = (RequestHandlerOptions *)options;
+    struct AppController* app_controller = request_handler_opts->app_controller;
+    int* client_socket = request_handler_opts->client_socket; 
+    request_handler(client_socket,app_controller);
+}
+
+void request_handler(int* client_socket, struct AppController* app_controller){
     if(!app_controller->controllers){
         printf("[<!>] You still didn't declare a route.");
         return;
@@ -141,7 +150,13 @@ void run(struct AppController *app_controller, int port){
             continue;
         }
 
-        request_handler(&client_socket, app_controller);
+        pthread_t client_thread;
+        if(pthread_create(&client_thread, NULL, request_handler_t,&(RequestHandlerOptions){.client_socket=&client_socket, .app_controller=app_controller}) != 0){
+            perror("Error on creating thread for client");
+        }
+        pthread_detach(client_thread);
+
+        //request_handler(&client_socket, app_controller);
     }
 
     close(server_socket);
