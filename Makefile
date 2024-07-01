@@ -1,6 +1,6 @@
 
 CC = clang
-CFLAGS = -Wall -Wextra -pedantic -std=c11 -Wreturn-type
+CFLAGS = -Wall -Wextra -pedantic -std=c11 -Wreturn-type -Wunused-parameter 
 INCLUDES_EXAMPLE = -I include/ examples/hello-world/include/cJSON.c -I examples/hello-world/include/
 SRCDIR = src
 SRC = $(wildcard $(SRCDIR)/*.c)

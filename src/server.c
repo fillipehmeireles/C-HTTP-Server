@@ -9,6 +9,28 @@
 #include <pthread.h>
 
 void request_handler(int *client_socket, struct AppController *app_controller);
+void split_route(char* route, PathResources *path_resources)
+{
+    char p[strlen(route) + 1];
+    strcpy(p, route);
+    char* path = p;
+    char *token = strtok(path, "/");
+    path_resources->path_counter = 0;
+    while(token != NULL){
+        path_resources->resources = (char **)realloc(path_resources->resources, (path_resources->path_counter + 2) * strlen(token));
+
+        if(!path_resources->resources)
+        {
+            perror("[!] Error on reallocating to path resources");
+            exit(EXIT_FAILURE);
+        }
+        path_resources->resources[path_resources->path_counter] = token;
+        path_resources->path_counter++;
+
+        token = strtok(NULL,"/");
+    }
+}
+
 struct AppController *create_app_controller(void)
 {
     struct AppController *app_controller = (struct AppController *)malloc(sizeof(struct AppController));
@@ -30,7 +52,33 @@ Controller *create_controller(Method method, char *route, Callback *callback)
         exit(EXIT_FAILURE);
     }
     controller->method = method;
-    controller->route = route;
+    PathResources* path_resources = (PathResources*)malloc(sizeof(PathResources));
+    if (!path_resources)
+    {
+        perror("[!] Error on creating path_resources");
+        exit(EXIT_FAILURE);
+    }
+    char p[strlen(route) + 1];
+    strcpy(p, route);
+
+    char *token = strtok(p, "/");
+    path_resources->path_counter = 0;
+    while(token != NULL){
+        path_resources->resources = (char **)realloc(path_resources->resources, (sizeof(char*)));
+
+        if(!path_resources->resources)
+        {
+            perror("[!] Error on reallocating to path resources");
+            exit(EXIT_FAILURE);
+        }
+        path_resources->resources[path_resources->path_counter] = strdup(token);
+        path_resources->path_counter++;
+
+        token = strtok(NULL,"/");
+    }
+
+    controller->path_resources = path_resources;
+
     controller->callback = callback;
 
     return controller;
@@ -44,7 +92,6 @@ void add_controller(struct AppController *app_controller, Method method, char *r
         fprintf(stderr, "[!] Error on adding controller [%s %s] to the app controller", method, route);
         exit(EXIT_FAILURE);
     }
-
     Controller *controller = create_controller(method, route, callback);
     app_controller->controllers[app_controller->controllers_c] = controller;
     app_controller->controllers_c++;
@@ -90,26 +137,85 @@ void request_handler(int *client_socket, struct AppController *app_controller)
             break;
         }
     }
-
+    token = NULL;
     char *method = headers[0];
+    char *p = headers[1];   
+    char* path = p;
+    PathResources* path_resources = (PathResources*)malloc(sizeof(PathResources));
+    if (!path_resources)
+    {
+        perror("[!] Error on creating path_resources");
+        exit(EXIT_FAILURE);
+    }
 
-    char *path = headers[1];
+    token = strtok(path, "/");
+    path_resources->path_counter = 0;
+    while(token != NULL){
+        path_resources->resources = (char **)realloc(path_resources->resources, (path_resources->path_counter + 2) * strlen(token));
+
+        if(!path_resources->resources)
+        {
+            perror("[!] Error on reallocating to path resources");
+            exit(EXIT_FAILURE);
+        }
+        path_resources->resources[path_resources->path_counter] = token;
+        path_resources->path_counter++;
+
+        token = strtok(NULL,"/");
+    }
+
     if (method == NULL || path == NULL)
     {
         close(*client_socket);
         return;
     }
     bool path_found, method_found = false;
+    RequestURLResources request_resources = (RequestURLResources){.url_resources_counter=0};
     for (int i = 0; i < app_controller->controllers_c; i++)
     {
-        if (strcmp(app_controller->controllers[i]->route, path) == 0)
+
+        if(app_controller->controllers[i]->path_resources->path_counter != path_resources->path_counter)
         {
-            path_found = true;
+            continue;
+        }
+
+        for(int j = 0; j < path_resources->path_counter; j++)
+        { 
+            char* resource_param = strstr(app_controller->controllers[i]->path_resources->resources[j],"<:");
+            if(resource_param)
+            {
+                request_resources.url_resources = (URLResource**)realloc(request_resources.url_resources, ((request_resources.url_resources_counter + 1) * sizeof(URLResource*)));
+                URLResource *url_resource = (URLResource*)malloc(sizeof(URLResource));
+                char* resource = strtok(resource_param,"<:>");
+                url_resource->key = resource;
+                url_resource->value = path_resources->resources[j];
+                request_resources.url_resources[request_resources.url_resources_counter] = url_resource;
+                request_resources.url_resources_counter++;
+                if(j == (path_resources->path_counter -1))
+                {
+                    path_found = true;
+                }
+
+                continue;
+            }
+
+            if(strcmp(app_controller->controllers[i]->path_resources->resources[j], path_resources->resources[j]) != 0)
+            {
+                break;
+            }
+
+            if(j == (path_resources->path_counter -1))
+            {
+                path_found = true;
+            }
+        }
+
+        if(path_found)
+        {
             if (strcmp((char *)app_controller->controllers[i]->method, method) == 0)
             {
-                app_controller->controllers[i]->callback(client_socket);
+                app_controller->controllers[i]->callback(client_socket, request_resources);
                 method_found = true;
-                break;
             }
         }
     }
@@ -226,3 +332,16 @@ void server_response_json(HTTPResponseOptions http_response_options)
     make_response(http_response_options, response);
 }
 
+char* ParamResource(RequestURLResources request_resources, char *key){
+    char* value = NULL;
+    for(int i = 0; i < request_resources.url_resources_counter; i++)
+    {
+
+        if(strcmp(request_resources.url_resources[i]->key,key) == 0)
+        {
+            value = strdup(request_resources.url_resources[i]->value);
+            break;
+        }
+    }
+    return value;
+}

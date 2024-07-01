@@ -34,10 +34,27 @@ typedef struct HTTPResponseOptions
     HTTP_STATUS status_code;
 } HTTPResponseOptions;
 
-typedef void(Callback)(int *);
+typedef struct PathResources
+{
+    char** resources;
+    int path_counter;
+} PathResources;
+
+typedef struct URLResource{
+    char* key;
+    char* value;
+}URLResource;
+
+typedef struct RequestURLResources{
+    URLResource **url_resources;
+    int url_resources_counter;
+} RequestURLResources;
+
+char* ParamResource(RequestURLResources, char*);
+typedef void(Callback)(int *, RequestURLResources);
 typedef struct Controller
 {
-    char *route;
+    PathResources *path_resources;
     Method method;
     Callback *callback;
 } Controller;
