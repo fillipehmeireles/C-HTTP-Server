@@ -86,19 +86,28 @@ void request_handler(int* client_socket, struct AppController* app_controller){
         close(*client_socket);
         return;
     }
+    bool path_found, method_found = false;
     for(int i = 0; i < app_controller->controllers_c; i++)
     {
-        if(strcmp(app_controller->controllers[i]->route,path) == 0 && strcmp((char*)app_controller->controllers[i]->method, method) == 0){
-            app_controller->controllers[i]->callback(client_socket);
-            break;
+        if(strcmp(app_controller->controllers[i]->route,path) == 0){
+            path_found = true;
+            if(strcmp((char*)app_controller->controllers[i]->method, method) == 0){
+                app_controller->controllers[i]->callback(client_socket);
+                method_found = true;
+                break;
+            }
         }
     }
     if(client_socket)
     {
-        char body [BUF_SIZE];
-        char* b = strdup(HTTP_404_MESSAGE);
-        sprintf(body, b, path);
-        server_response((HTTPResponseOptions){.client_socket=client_socket,.body=body,.status_code=HTTP_STATUS_NOT_FOUND});
+        if(!path_found){
+            char body [BUF_SIZE];
+            char* b = strdup(HTTP_404_MESSAGE);
+            sprintf(body, b, path);
+            server_response((HTTPResponseOptions){.client_socket=client_socket,.body=body,.status_code=HTTP_STATUS_NOT_FOUND});
+        }else if(path_found && !method_found){
+           server_response((HTTPResponseOptions){.client_socket=client_socket,.body=strdup(HTTP_405_MESSAGE),.status_code=HTTP_STATUS_MethodNotAllowed});
+        }
     }
 }
 

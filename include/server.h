@@ -5,9 +5,12 @@
 #define BUF_SIZE 1024
 
 static const char* HTTP_404_MESSAGE = "<head> <title>404 Not Found</title> </head><body><h1>Not Found</h1><p>The requested URL %s was not found on this server.</p></body></html>";
+static const char* HTTP_405_MESSAGE = "<!DOCTYPE html><html><head><title>405 Method Not Allowed</title></head><body><h1>Method Not Allowed</h1><p>The requested method is not allowed for the URL.</p></body></html>";
+
 typedef const char* HTTP_STATUS;
 static const HTTP_STATUS HTTP_STATUS_OK ="200 OK";
 static const HTTP_STATUS HTTP_STATUS_NOT_FOUND = "404 Not Found";
+static const HTTP_STATUS HTTP_STATUS_MethodNotAllowed = "405 Method Not Allowed";
 
 typedef const char* HTTP_HEADERS;
 static const HTTP_HEADERS HTTP_VERSION = "HTTP/1.1";
