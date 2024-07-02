@@ -146,7 +146,7 @@ Once your PR is reviewed and approved, it will be merged into the main branch.
 
 ##  License
 
-This project is under the [MIT](https://github.com/fillipehmeireles/C-HTTP-Server/LICENSE) License.
+This project is under the [MIT](https://github.com/fillipehmeireles/C-HTTP-Server/blob/master/LICENSE) License.
 
 ---
 
